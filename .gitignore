@@ -1,0 +1,48 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Local configuration (machine specific)
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# VS Code
+.vscode/
+
+# Kotlin / Java compiled outputs
+*.class
+out/
+
+# Logs
+*.log
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Android captures
+captures/
+
+# Native build outputs
+.cxx/
+
+# Profiling and crash dumps
+*.hprof
+java_pid*.hprof
+
+# Keystore and signing files
+*.jks
+*.keystore
+*.pem
+*.p12
+
+# Misc temporary files
+*.swp
+*.swo
+*.tmp
