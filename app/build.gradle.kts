@@ -84,4 +84,7 @@ dependencies {
 
     // Serialization (JSON backup)
     implementation(libs.kotlinx.serialization.json)
+
+        // Core icons only — ~100 KB, avoids the extended-icons OOM in debug builds
+    implementation("androidx.compose.material:material-icons-core")
 }

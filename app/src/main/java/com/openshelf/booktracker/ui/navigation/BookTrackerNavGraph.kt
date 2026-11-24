@@ -80,8 +80,11 @@ fun BookTrackerNavGraph(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Library.route) {
-                // Phase 4 will replace with LibraryScreen(...)
-                PlaceholderScreen("Library")
+                com.openshelf.booktracker.ui.screens.library.LibraryScreen(
+                    onBookClick = { bookId ->
+                        navController.navigate(Screen.BookDetail.createRoute(bookId))
+                    }
+                )
             }
 
             composable(Screen.Stats.route) {
