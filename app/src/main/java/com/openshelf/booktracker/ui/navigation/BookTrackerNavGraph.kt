@@ -80,8 +80,11 @@ fun BookTrackerNavGraph(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Library.route) {
-                // Phase 4 will replace with LibraryScreen(...)
-                PlaceholderScreen("Library")
+                com.openshelf.booktracker.ui.screens.library.LibraryScreen(
+                    onBookClick = { bookId ->
+                        navController.navigate(Screen.BookDetail.createRoute(bookId))
+                    }
+                )
             }
 
             composable(Screen.Stats.route) {
@@ -94,9 +97,12 @@ fun BookTrackerNavGraph(
                 arguments = listOf(
                     navArgument(Screen.BookDetail.ARG_BOOK_ID) { type = NavType.LongType }
                 )
-            ) {
-                // Phase 5 will replace with BookDetailScreen(...)
-                PlaceholderScreen("Book Detail")
+            ) { backStackEntry ->
+                val bookId = backStackEntry.arguments?.getLong(Screen.BookDetail.ARG_BOOK_ID) ?: -1L
+                com.openshelf.booktracker.ui.screens.detail.BookDetailScreen(
+                    bookId = bookId,
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }

@@ -46,3 +46,6 @@ java_pid*.hprof
 *.swp
 *.swo
 *.tmp
+
+
+gradle.properties

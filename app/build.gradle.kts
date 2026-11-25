@@ -21,7 +21,32 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    // ---- Release signing ----
+    // Reads credentials from gradle.properties (recommended)
+    // or falls back to environment variables. Never hardcode passwords here.
+    signingConfigs {
+        create("release") {
+            val keystorePath = (project.findProperty("RELEASE_STORE_FILE") as String?)
+                ?: System.getenv("RELEASE_STORE_FILE")
+                ?: "../booktracker-release.jks"
+
+            storeFile = file(keystorePath)
+            storePassword = (project.findProperty("RELEASE_STORE_PASSWORD") as String?)
+                ?: System.getenv("RELEASE_STORE_PASSWORD")
+                ?: ""
+            keyAlias = (project.findProperty("RELEASE_KEY_ALIAS") as String?)
+                ?: System.getenv("RELEASE_KEY_ALIAS")
+                ?: "booktracker"
+            keyPassword = (project.findProperty("RELEASE_KEY_PASSWORD") as String?)
+                ?: System.getenv("RELEASE_KEY_PASSWORD")
+                ?: ""
+        }
+    }
+
     buildTypes {
+        debug {
+            isMinifyEnabled = false
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -29,6 +54,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -58,6 +84,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.activity.compose)
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
@@ -65,7 +92,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
+    implementation("androidx.compose.material:material-icons-extended")
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     // Navigation
