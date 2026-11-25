@@ -111,4 +111,10 @@ dependencies {
 
     // Serialization (JSON backup)
     implementation(libs.kotlinx.serialization.json)
+
+        // Image loading for book covers
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Full icon set (R8 strips unused in release)
+    implementation("androidx.compose.material:material-icons-extended")
 }

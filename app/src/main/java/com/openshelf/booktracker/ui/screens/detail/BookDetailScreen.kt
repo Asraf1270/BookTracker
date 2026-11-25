@@ -1,6 +1,5 @@
 package com.openshelf.booktracker.ui.screens.detail
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,11 +23,10 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,12 +39,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -54,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -64,6 +65,7 @@ import com.openshelf.booktracker.data.local.entity.BookEntity
 import com.openshelf.booktracker.data.local.entity.BookNoteEntity
 import com.openshelf.booktracker.data.local.entity.NoteType
 import com.openshelf.booktracker.data.local.entity.ReadingStatus
+import com.openshelf.booktracker.ui.components.BookCover
 import com.openshelf.booktracker.ui.components.EmptyStateView
 import com.openshelf.booktracker.ui.components.ProgressRing
 import com.openshelf.booktracker.util.ViewModelFactory
@@ -77,9 +79,8 @@ fun BookDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as BookTrackerApp
+    val app = LocalContext.current.applicationContext as BookTrackerApp
     val factory = remember { ViewModelFactory(app) }
-    // Standard viewModel() will retrieve via factory using the route's SavedStateHandle automatically
     val vm: BookDetailViewModel = viewModel(factory = factory)
 
     val book by vm.book.collectAsStateWithLifecycle()
@@ -89,10 +90,10 @@ fun BookDetailScreen(
     var showProgressDialog by remember { mutableStateOf(false) }
     var showTimerDialog by remember { mutableStateOf(false) }
     var showAddNoteDialog by remember { mutableStateOf(false) }
+    var showRatingDialog by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<BookNoteEntity?>(null) }
     var pendingDeleteNote by remember { mutableStateOf<BookNoteEntity?>(null) }
     var pendingDeleteBook by remember { mutableStateOf(false) }
-
     var notesFilter by remember { mutableStateOf(NotesFilter.ALL) }
 
     val current = book
@@ -124,7 +125,12 @@ fun BookDetailScreen(
     ) { innerPadding ->
 
         if (current == null) {
-            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
                 Text("Book not found", style = MaterialTheme.typography.titleMedium)
             }
             return@Scaffold
@@ -139,11 +145,18 @@ fun BookDetailScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { HeaderCard(current) }
+            item { HeaderCard(book = current, onEditRating = { showRatingDialog = true }) }
             item { ProgressCard(current) { showProgressDialog = true } }
-            item { ActionsRow(onEdit = { showProgressDialog = true }, onTimer = { showTimerDialog = true }) }
+            item {
+                ActionsRow(
+                    onQuickAdd = { delta ->
+                        vm.updatePage((current.currentPage + delta).coerceAtMost(current.totalPages))
+                    },
+                    onCustom = { showProgressDialog = true },
+                    onTimer = { showTimerDialog = true }
+                )
+            }
 
-            // Session summary
             if (sessions.isNotEmpty()) {
                 item {
                     val totalMin = sessions.sumOf { it.durationSeconds } / 60
@@ -213,6 +226,7 @@ fun BookDetailScreen(
     }
 
     // ---- Dialogs ----
+
     if (showProgressDialog && current != null) {
         PageProgressDialog(
             book = current,
@@ -239,6 +253,17 @@ fun BookDetailScreen(
         )
     }
 
+    if (showRatingDialog && current != null) {
+        RatingDialog(
+            initial = current.rating,
+            onDismiss = { showRatingDialog = false },
+            onSave = { newRating ->
+                vm.updateRating(newRating)
+                showRatingDialog = false
+            }
+        )
+    }
+
     if (showAddNoteDialog) {
         NoteEditorDialog(
             initial = null,
@@ -257,7 +282,9 @@ fun BookDetailScreen(
             totalPages = current?.totalPages ?: 0,
             onDismiss = { editingNote = null },
             onSave = { type, content, page, tags ->
-                vm.updateNote(note.copy(type = type, content = content, pageNumber = page, tags = tags))
+                vm.updateNote(
+                    note.copy(type = type, content = content, pageNumber = page, tags = tags)
+                )
                 editingNote = null
             }
         )
@@ -287,7 +314,9 @@ fun BookDetailScreen(
             confirmButton = {
                 TextButton(onClick = {
                     vm.deleteBook { pendingDeleteBook = false; onBack() }
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteBook = false }) { Text("Cancel") }
@@ -296,45 +325,87 @@ fun BookDetailScreen(
     }
 }
 
+// ---------------- Sub-composables ----------------
+
 @Composable
-private fun HeaderCard(book: BookEntity) {
+private fun HeaderCard(
+    book: BookEntity,
+    onEditRating: () -> Unit
+) {
     val coverColor = Color(book.coverColor)
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
-        Column(Modifier.padding(16.dp)) {
-            Text(book.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(book.author, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                    color = coverColor.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(8.dp)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            BookCover(
+                coverColor = book.coverColor,
+                coverImageUri = book.coverImageUri,
+                title = book.title,
+                modifier = Modifier.size(width = 88.dp, height = 128.dp),
+                cornerRadius = 10.dp
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    book.title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    book.author,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        book.status.pretty(),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = coverColor
-                    )
-                }
-                if (book.genre != null) {
-                    Text(book.genre, style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (book.rating > 0f) {
-                    Row {
-                        for (i in 1..5) {
-                            Icon(
-                                imageVector = if (book.rating >= i) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.tertiary
-                            )
-                        }
+                    Surface(
+                        color = coverColor.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            book.status.pretty(),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = coverColor
+                        )
                     }
+                    if (book.genre != null) {
+                        Text(
+                            book.genre,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onEditRating() }
+                ) {
+                    for (i in 1..5) {
+                        Icon(
+                            imageVector = if (book.rating >= i) Icons.Filled.Star
+                                          else Icons.Filled.StarBorder,
+                            contentDescription = "Rate",
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.tertiary
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        if (book.rating <= 0f) "Tap to rate"
+                        else "%.1f".format(book.rating),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -366,7 +437,10 @@ private fun ProgressCard(book: BookEntity, onEdit: () -> Unit) {
                 Spacer(Modifier.height(4.dp))
                 LinearProgressIndicator(
                     progress = { book.progressFraction },
-                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
                     color = Color(book.coverColor)
                 )
             }
@@ -378,20 +452,40 @@ private fun ProgressCard(book: BookEntity, onEdit: () -> Unit) {
 }
 
 @Composable
-private fun ActionsRow(onEdit: () -> Unit, onTimer: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Button(onClick = onEdit, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Filled.Edit, contentDescription = null)
-            Spacer(Modifier.width(4.dp))
-            Text("+ Pages")
+private fun ActionsRow(
+    onQuickAdd: (Int) -> Unit,
+    onCustom: () -> Unit,
+    onTimer: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            listOf(5, 10, 20).forEach { delta ->
+                OutlinedButton(
+                    onClick = { onQuickAdd(delta) },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(vertical = 6.dp)
+                ) {
+                    Text("+$delta")
+                }
+            }
+            OutlinedButton(
+                onClick = onCustom,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(vertical = 6.dp)
+            ) {
+                Text("Custom")
+            }
         }
-        OutlinedButton(onClick = onTimer, modifier = Modifier.weight(1f)) {
-            Icon(Icons.Filled.Timer, contentDescription = null)
+        OutlinedButton(
+            onClick = onTimer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(Icons.Filled.PlayArrow, contentDescription = null)
             Spacer(Modifier.width(4.dp))
-            Text("Timer")
+            Text("Start Reading Timer")
         }
     }
 }
@@ -403,7 +497,9 @@ private fun NoteCard(
     onDelete: () -> Unit
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onEdit),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit),
         shape = RoundedCornerShape(12.dp),
         tonalElevation = 1.dp
     ) {
@@ -416,12 +512,19 @@ private fun NoteCard(
                 )
                 if (note.pageNumber != null) {
                     Spacer(Modifier.width(6.dp))
-                    Text("· p.${note.pageNumber}", style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "· p.${note.pageNumber}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = "Delete", modifier = Modifier.size(18.dp))
+                    Icon(
+                        Icons.Filled.Close,
+                        contentDescription = "Delete",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
             Text(
@@ -462,6 +565,40 @@ private fun PageProgressDialog(
         },
         confirmButton = {
             TextButton(onClick = { pageInput.toIntOrNull()?.let(onConfirm) }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun RatingDialog(
+    initial: Float,
+    onDismiss: () -> Unit,
+    onSave: (Float) -> Unit
+) {
+    var rating by remember { mutableFloatStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate this book") },
+        text = {
+            Column {
+                Text(
+                    if (rating <= 0f) "Not rated" else "%.1f / 5".format(rating),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(8.dp))
+                Slider(
+                    value = rating,
+                    onValueChange = { rating = it },
+                    valueRange = 0f..5f,
+                    steps = 9
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(rating) }) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
@@ -523,11 +660,14 @@ private fun NoteEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val page = pageInput.toIntOrNull()
-                val tags = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                onSave(type, content, page, tags)
-            }, enabled = content.isNotBlank()) { Text("Save") }
+            TextButton(
+                onClick = {
+                    val page = pageInput.toIntOrNull()?.takeIf { it in 1..totalPages }
+                    val tags = tagsInput.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                    onSave(type, content, page, tags)
+                },
+                enabled = content.isNotBlank()
+            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

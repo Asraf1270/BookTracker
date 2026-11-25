@@ -112,4 +112,12 @@ class BookDetailViewModel(
             onDeleted()
         }
     }
+
+    // Update Rating
+    fun updateRating(newRating: Float) {
+        val current = book.value ?: return
+        viewModelScope.launch {
+            repo.updateBook(current.copy(rating = newRating.coerceIn(0f, 5f)))
+        }
+    }
 }

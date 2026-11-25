@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.openshelf.booktracker.data.local.entity.BookEntity
 import com.openshelf.booktracker.data.local.entity.ReadingStatus
+import com.openshelf.booktracker.ui.components.BookCover
 
 @Composable
 fun BookCard(
@@ -57,12 +58,13 @@ fun BookCard(
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Cover strip
-            Box(
-                modifier = Modifier
-                    .size(width = 8.dp, height = 88.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(coverColor)
+            // Cover thumbnail
+            BookCover(
+                coverColor = book.coverColor,
+                coverImageUri = book.coverImageUri,
+                title = book.title,
+                modifier = Modifier.size(width = 60.dp, height = 88.dp),
+                cornerRadius = 8.dp
             )
 
             Spacer(Modifier.width(12.dp))
