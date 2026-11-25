@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.openshelf.booktracker.BookTrackerApp
 import com.openshelf.booktracker.util.ViewModelFactory
+import androidx.compose.ui.draw.clip
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,6 +182,46 @@ private fun OverviewTab(uiState: StatsUiState) {
                 }
             }
         }
+        item {
+            val goalPages = uiState.goals.dailyPageGoal
+            val goalMins = uiState.goals.dailyMinuteGoal
+            if (goalPages > 0 || goalMins > 0) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            "Today",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(Modifier.height(8.dp))
+
+                        if (goalPages > 0) {
+                            val p = (uiState.todayPages.toFloat() / goalPages).coerceIn(0f, 1f)
+                            DailyProgressRow(
+                                label = "Pages",
+                                current = uiState.todayPages.toString(),
+                                target = goalPages.toString(),
+                                progress = p
+                            )
+                            Spacer(Modifier.height(10.dp))
+                        }
+
+                        if (goalMins > 0) {
+                            val todayMin = (uiState.todayDurationSeconds / 60).toInt()
+                            val p = (todayMin.toFloat() / goalMins).coerceIn(0f, 1f)
+                            DailyProgressRow(
+                                label = "Minutes",
+                                current = todayMin.toString(),
+                                target = goalMins.toString(),
+                                progress = p
+                            )
+                        }
+                    }
+                }
+            }
+        }
         if (uiState.goals.yearlyBookGoal > 0) {
             item {
                 val progress = (uiState.completedCount.toFloat() / uiState.goals.yearlyBookGoal)
@@ -282,5 +323,35 @@ private fun GoalsTab(uiState: StatsUiState, onSave: (Int, Int, Int) -> Unit) {
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Save goals") }
+    }
+}
+
+@Composable
+private fun DailyProgressRow(
+    label: String,
+    current: String,
+    target: String,
+    progress: Float
+) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, style = MaterialTheme.typography.labelLarge)
+            Text(
+                "$current / $target",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(4.dp))
+        )
     }
 }

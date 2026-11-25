@@ -103,6 +103,16 @@ class BookRepository(
     fun observeTotalPagesRead(): Flow<Int> = sessionDao.observeTotalPagesRead()
     fun observeDistinctReadingDays(): Flow<List<String>> = sessionDao.observeDistinctReadingDays()
 
+    /** Epoch millis of today's local midnight (00:00). */
+    fun todayStartMillis(): Long =
+        LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    fun observeTodayPagesRead(): Flow<Int> =
+        sessionDao.observePagesReadSince(todayStartMillis())
+
+    fun observeTodayDurationSeconds(): Flow<Long> =
+        sessionDao.observeDurationSecondsSince(todayStartMillis())
+        
     suspend fun logSession(session: ReadingSessionEntity): Long =
         sessionDao.insert(session)
 

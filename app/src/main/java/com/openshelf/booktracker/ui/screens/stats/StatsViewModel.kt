@@ -31,7 +31,9 @@ data class StatsUiState(
     val totalDurationSeconds: Long = 0,
     val currentStreakDays: Int = 0,
     val goals: ReadingGoals = ReadingGoals(),
-    val recentBooks: List<BookEntity> = emptyList()
+    val recentBooks: List<BookEntity> = emptyList(),
+    val todayPages: Int = 0,
+    val todayDurationSeconds: Long = 0
 )
 
 class StatsViewModel(
@@ -45,8 +47,17 @@ class StatsViewModel(
     val uiState: StateFlow<StatsUiState> = combine(
         bookRepo.observeStats(),
         prefsRepo.goals,
-        bookRepo.observeAllBooks()
-    ) { stats, goals, allBooks ->
+        bookRepo.observeAllBooks(),
+        bookRepo.observeTodayPagesRead(),
+        bookRepo.observeTodayDurationSeconds()
+    ) { arr ->
+        @Suppress("UNCHECKED_CAST")
+        val stats = arr[0] as com.openshelf.booktracker.data.repository.BookRepository.StatsSnapshot
+        val goals = arr[1] as ReadingGoals
+        val allBooks = arr[2] as List<BookEntity>
+        val todayPages = arr[3] as Int
+        val todaySecs = arr[4] as Long
+
         StatsUiState(
             completedCount = stats.completedCount,
             totalBookCount = stats.totalBookCount,
@@ -55,14 +66,15 @@ class StatsViewModel(
             totalDurationSeconds = stats.totalDurationSeconds,
             currentStreakDays = computeStreak(stats.distinctDays),
             goals = goals,
-            recentBooks = allBooks.sortedByDescending { it.updatedAt }.take(5)
+            recentBooks = allBooks.sortedByDescending { it.updatedAt }.take(5),
+            todayPages = todayPages,
+            todayDurationSeconds = todaySecs
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         StatsUiState()
     )
-
     fun saveGoals(yearly: Int, dailyPages: Int, dailyMinutes: Int) {
         viewModelScope.launch {
             prefsRepo.setGoals(ReadingGoals(yearly, dailyPages, dailyMinutes))

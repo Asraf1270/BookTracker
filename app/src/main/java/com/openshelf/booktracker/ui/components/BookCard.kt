@@ -18,8 +18,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -125,7 +123,10 @@ fun BookCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (book.status == ReadingStatus.COMPLETED && book.rating > 0f) {
-                            RatingStars(rating = book.rating)
+                            com.openshelf.booktracker.ui.components.RatingStars(
+                                rating = book.rating,
+                                starSize = 14.dp
+                            )
                         }
                     }
                 }
@@ -172,21 +173,6 @@ fun BookCard(
                     menuOpen = false
                     onDelete()
                 }
-            )
-        }
-    }
-}
-
-@Composable
-private fun RatingStars(rating: Float) {
-    Row {
-        for (i in 1..5) {
-            val filled = rating >= i
-            Icon(
-                imageVector = if (filled) Icons.Filled.Star else Icons.Filled.StarBorder,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.tertiary,
-                modifier = Modifier.size(14.dp)
             )
         }
     }

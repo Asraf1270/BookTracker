@@ -24,8 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -69,6 +67,7 @@ import com.openshelf.booktracker.ui.components.BookCover
 import com.openshelf.booktracker.ui.components.EmptyStateView
 import com.openshelf.booktracker.ui.components.ProgressRing
 import com.openshelf.booktracker.util.ViewModelFactory
+import com.openshelf.booktracker.ui.components.RatingStars
 
 private enum class NotesFilter { ALL, NOTES, QUOTES }
 
@@ -408,15 +407,10 @@ private fun HeaderCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { onEditRating() }
                 ) {
-                    for (i in 1..5) {
-                        Icon(
-                            imageVector = if (book.rating >= i) Icons.Filled.Star
-                                          else Icons.Filled.StarBorder,
-                            contentDescription = "Rate",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
+                    RatingStars(
+                        rating = book.rating,
+                        starSize = 20.dp
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         if (book.rating <= 0f) "Tap to rate"

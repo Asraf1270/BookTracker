@@ -43,4 +43,20 @@ interface SessionDao {
 
     @Query("DELETE FROM reading_sessions")
     suspend fun clearAll()
+
+    @Query(
+        """
+        SELECT COALESCE(SUM(pagesRead), 0) FROM reading_sessions
+        WHERE startedAt >= :dayStartMillis
+        """
+    )
+    fun observePagesReadSince(dayStartMillis: Long): Flow<Int>
+
+    @Query(
+        """
+        SELECT COALESCE(SUM(durationSeconds), 0) FROM reading_sessions
+        WHERE startedAt >= :dayStartMillis
+        """
+    )
+    fun observeDurationSecondsSince(dayStartMillis: Long): Flow<Long>
 }
