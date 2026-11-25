@@ -68,6 +68,7 @@ fun LibraryScreen(
     var showAddSheet by remember { mutableStateOf(false) }
     var editingBook by remember { mutableStateOf<BookEntity?>(null) }
     var quickProgressBook by remember { mutableStateOf<BookEntity?>(null) }
+    var pendingDeleteBook by remember { mutableStateOf<BookEntity?>(null) }
 
     Scaffold(
         modifier = modifier,
@@ -146,7 +147,12 @@ fun LibraryScreen(
                                 editingBook = null
                                 onBookClick(book.id)
                             },
-                            onQuickAddPages = { quickProgressBook = book }
+                            onQuickAddPages = { quickProgressBook = book },
+                            onEdit = { editingBook = book },
+                            onMarkCompleted = {
+                                vm.updateStatus(book.id, ReadingStatus.COMPLETED)
+                            },
+                            onDelete = { pendingDeleteBook = book }
                         )
                     }
                 }
@@ -177,6 +183,27 @@ fun LibraryScreen(
             onConfirm = { newPage ->
                 vm.updateProgress(book.id, newPage)
                 quickProgressBook = null
+            }
+        )
+    }
+
+    pendingDeleteBook?.let { book ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { pendingDeleteBook = null },
+            title = { Text("Delete book?") },
+            text = { Text("Deletes \"${book.title}\" along with its sessions and notes.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    vm.deleteBook(book)
+                    pendingDeleteBook = null
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { pendingDeleteBook = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }

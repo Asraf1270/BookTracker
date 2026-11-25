@@ -95,7 +95,7 @@ fun BookDetailScreen(
     var pendingDeleteNote by remember { mutableStateOf<BookNoteEntity?>(null) }
     var pendingDeleteBook by remember { mutableStateOf(false) }
     var notesFilter by remember { mutableStateOf(NotesFilter.ALL) }
-
+    var showEditSheet by remember { mutableStateOf(false) }
     val current = book
 
     Scaffold(
@@ -109,6 +109,9 @@ fun BookDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showEditSheet = true }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit book")
+                    }
                     IconButton(onClick = { pendingDeleteBook = true }) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete book")
                     }
@@ -174,6 +177,21 @@ fun BookDetailScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(8.dp))
+                            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Spacer(Modifier.height(4.dp))
+                            // Latest 5 sessions inline
+                            sessions.take(5).forEach { s ->
+                                SessionRow(session = s)
+                            }
+                            if (sessions.size > 5) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "+ ${sessions.size - 5} more",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -673,6 +691,49 @@ private fun NoteEditorDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun SessionRow(session: com.openshelf.booktracker.data.local.entity.ReadingSessionEntity) {
+    val date = java.time.Instant.ofEpochMilli(session.startedAt)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalDate()
+    val minutes = session.durationSeconds / 60
+    val label = when {
+        minutes >= 60 -> "${minutes / 60}h ${minutes % 60}m"
+        minutes > 0 -> "${minutes}m"
+        else -> "${session.durationSeconds}s"
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                date.format(java.time.format.DateTimeFormatter.ofPattern("MMM d")),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "pp. ${session.startPage} → ${session.endPage} (+${session.pagesRead})",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun Divider(color: androidx.compose.ui.graphics.Color) {
+    androidx.compose.material3.HorizontalDivider(color = color)
 }
 
 private fun ReadingStatus.pretty(): String = when (this) {

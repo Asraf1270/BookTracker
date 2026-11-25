@@ -68,6 +68,32 @@ class BookRepository(
         }
     }
 
+    /** Explicitly set status — used by long-press "Mark as Completed" menu. */
+    suspend fun updateStatus(bookId: Long, status: ReadingStatus) {
+        val book = bookDao.getById(bookId) ?: return
+        val now = System.currentTimeMillis()
+        val updated = when (status) {
+            ReadingStatus.COMPLETED -> book.copy(
+                status = status,
+                currentPage = book.totalPages,
+                finishDate = book.finishDate ?: LocalDate.now(),
+                updatedAt = now
+            )
+            ReadingStatus.CURRENTLY_READING -> book.copy(
+                status = status,
+                finishDate = null,
+                startDate = book.startDate ?: LocalDate.now(),
+                updatedAt = now
+            )
+            ReadingStatus.WANT_TO_READ -> book.copy(
+                status = status,
+                finishDate = null,
+                updatedAt = now
+            )
+        }
+        bookDao.update(updated)
+    }
+
     // ---- Sessions ----
     fun observeSessionsForBook(bookId: Long): Flow<List<ReadingSessionEntity>> =
         sessionDao.observeForBook(bookId)

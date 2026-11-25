@@ -71,7 +71,13 @@ class LibraryViewModel(
         viewModelScope.launch { repo.deleteBook(book) }
     }
 
+    /** Quick "+N pages" or custom page entry from the Library popup. */
     fun updateProgress(bookId: Long, newPage: Int) {
         viewModelScope.launch { repo.updateProgress(bookId, newPage) }
+    }
+
+    /** Long-press "Mark as Completed" menu action. */
+    fun updateStatus(bookId: Long, status: ReadingStatus) {
+        viewModelScope.launch { repo.updateStatus(bookId, status) }
     }
 }
