@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.openshelf.booktracker.data.local.dao.SessionDao
 import com.openshelf.booktracker.data.local.entity.BookEntity
 import com.openshelf.booktracker.data.local.entity.BookNoteEntity
 import com.openshelf.booktracker.data.local.entity.NoteType
@@ -33,7 +34,8 @@ data class StatsUiState(
     val goals: ReadingGoals = ReadingGoals(),
     val recentBooks: List<BookEntity> = emptyList(),
     val todayPages: Int = 0,
-    val todayDurationSeconds: Long = 0
+    val todayDurationSeconds: Long = 0,
+    val readingDays: List<SessionDao.DayAggregate> = emptyList()
 )
 
 class StatsViewModel(
@@ -49,14 +51,16 @@ class StatsViewModel(
         prefsRepo.goals,
         bookRepo.observeAllBooks(),
         bookRepo.observeTodayPagesRead(),
-        bookRepo.observeTodayDurationSeconds()
+        bookRepo.observeTodayDurationSeconds(),
+        bookRepo.observeReadingDaysLastYear()
     ) { arr ->
         @Suppress("UNCHECKED_CAST")
-        val stats = arr[0] as com.openshelf.booktracker.data.repository.BookRepository.StatsSnapshot
+        val stats = arr[0] as BookRepository.StatsSnapshot
         val goals = arr[1] as ReadingGoals
         val allBooks = arr[2] as List<BookEntity>
         val todayPages = arr[3] as Int
         val todaySecs = arr[4] as Long
+        val readingDays = arr[5] as List<SessionDao.DayAggregate>
 
         StatsUiState(
             completedCount = stats.completedCount,
@@ -68,13 +72,15 @@ class StatsViewModel(
             goals = goals,
             recentBooks = allBooks.sortedByDescending { it.updatedAt }.take(5),
             todayPages = todayPages,
-            todayDurationSeconds = todaySecs
+            todayDurationSeconds = todaySecs,
+            readingDays = readingDays
         )
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5_000),
         StatsUiState()
     )
+
     fun saveGoals(yearly: Int, dailyPages: Int, dailyMinutes: Int) {
         viewModelScope.launch {
             prefsRepo.setGoals(ReadingGoals(yearly, dailyPages, dailyMinutes))

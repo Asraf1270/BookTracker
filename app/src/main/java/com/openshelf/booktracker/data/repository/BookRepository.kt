@@ -116,6 +116,10 @@ class BookRepository(
     suspend fun logSession(session: ReadingSessionEntity): Long =
         sessionDao.insert(session)
 
+    fun observeReadingDaysLastYear(): Flow<List<SessionDao.DayAggregate>> =
+        sessionDao.observePerDayAggregate(
+            System.currentTimeMillis() - 365L * 24 * 60 * 60 * 1000
+        )
     // ---- Notes ----
     fun observeNotesForBook(bookId: Long): Flow<List<BookNoteEntity>> =
         noteDao.observeForBook(bookId)

@@ -51,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.openshelf.booktracker.BookTrackerApp
 import com.openshelf.booktracker.util.ViewModelFactory
 import androidx.compose.ui.draw.clip
+import com.openshelf.booktracker.ui.components.StreakHeatmap
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,6 +180,27 @@ private fun OverviewTab(uiState: StatsUiState) {
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
+                }
+            }
+        }
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(
+                        "Reading activity",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "Last 12 months · pages read per day",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    StreakHeatmap(days = uiState.readingDays)
                 }
             }
         }

@@ -59,4 +59,23 @@ interface SessionDao {
         """
     )
     fun observeDurationSecondsSince(dayStartMillis: Long): Flow<Long>
+
+        data class DayAggregate(
+        val day: String,
+        val pages: Int,
+        val minutes: Int
+    )
+
+    @Query(
+        """
+        SELECT strftime('%Y-%m-%d', startedAt / 1000, 'unixepoch', 'localtime') AS day,
+               COALESCE(SUM(pagesRead), 0) AS pages,
+               CAST(COALESCE(SUM(durationSeconds), 0) / 60 AS INTEGER) AS minutes
+        FROM reading_sessions
+        WHERE startedAt >= :sinceMillis
+        GROUP BY day
+        ORDER BY day ASC
+        """
+    )
+    fun observePerDayAggregate(sinceMillis: Long): Flow<List<DayAggregate>>
 }
