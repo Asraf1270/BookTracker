@@ -48,6 +48,7 @@ import com.openshelf.booktracker.data.local.entity.ReadingStatus
 import com.openshelf.booktracker.ui.components.BookCard
 import com.openshelf.booktracker.ui.components.EmptyStateView
 import com.openshelf.booktracker.util.ViewModelFactory
+import androidx.compose.material3.OutlinedButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -187,27 +188,69 @@ private fun QuickProgressDialog(
     onDismiss: () -> Unit,
     onConfirm: (Int) -> Unit
 ) {
+    // Working page value — starts at current, updated by quick buttons or text field
     var pageInput by remember { mutableStateOf(book.currentPage.toString()) }
+    val currentValue = pageInput.toIntOrNull() ?: book.currentPage
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Update progress") },
         text = {
-            Column {
-                Text("${book.title}", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(book.title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Currently ${book.currentPage} of ${book.totalPages} pages",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Quick-add buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(5, 10, 20).forEach { delta ->
+                        OutlinedButton(
+                            onClick = {
+                                val next = (currentValue + delta).coerceAtMost(book.totalPages)
+                                pageInput = next.toString()
+                            },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 4.dp)
+                        ) {
+                            Text("+$delta")
+                        }
+                    }
+                }
+
+                // Custom exact page
                 OutlinedTextField(
                     value = pageInput,
                     onValueChange = { pageInput = it.filter(Char::isDigit) },
-                    label = { Text("Current page (of ${book.totalPages})") },
+                    label = { Text("Set page (of ${book.totalPages})") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Live preview
+                val clamped = currentValue.coerceIn(0, book.totalPages)
+                val pct = if (book.totalPages > 0) (clamped * 100) / book.totalPages else 0
+                Text(
+                    "Will set to $clamped / ${book.totalPages} ($pct%)",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                pageInput.toIntOrNull()?.let(onConfirm)
-            }) { Text("Save") }
+            TextButton(
+                onClick = {
+                    val final = currentValue.coerceIn(0, book.totalPages)
+                    onConfirm(final)
+                },
+                enabled = pageInput.isNotBlank()
+            ) { Text("Save") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
