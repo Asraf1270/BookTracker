@@ -46,40 +46,47 @@ class StatsViewModel(
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
-    val uiState: StateFlow<StatsUiState> = combine(
+    // 1) Combine the 5 flows that existed before the heatmap was added.
+    //    All 5 have strongly typed overloads, so no casting is needed.
+    private data class CoreStats(
+        val stats: BookRepository.StatsSnapshot,
+        val goals: ReadingGoals,
+        val allBooks: List<BookEntity>,
+        val todayPages: Int,
+        val todaySecs: Long
+    )
+
+    private val coreStatsFlow = combine(
         bookRepo.observeStats(),
         prefsRepo.goals,
         bookRepo.observeAllBooks(),
         bookRepo.observeTodayPagesRead(),
-        bookRepo.observeTodayDurationSeconds(),
-        bookRepo.observeReadingDaysLastYear()
-    ) { arr ->
-        @Suppress("UNCHECKED_CAST")
-        val stats = arr[0] as BookRepository.StatsSnapshot
-        val goals = arr[1] as ReadingGoals
-        val allBooks = arr[2] as List<BookEntity>
-        val todayPages = arr[3] as Int
-        val todaySecs = arr[4] as Long
-        val readingDays = arr[5] as List<SessionDao.DayAggregate>
+        bookRepo.observeTodayDurationSeconds()
+    ) { stats, goals, allBooks, todayPages, todaySecs ->
+        CoreStats(stats, goals, allBooks, todayPages, todaySecs)
+    }
 
-        StatsUiState(
-            completedCount = stats.completedCount,
-            totalBookCount = stats.totalBookCount,
-            totalPagesInLibrary = stats.totalPagesInLibrary,
-            totalPagesRead = stats.totalPagesRead,
-            totalDurationSeconds = stats.totalDurationSeconds,
-            currentStreakDays = computeStreak(stats.distinctDays),
-            goals = goals,
-            recentBooks = allBooks.sortedByDescending { it.updatedAt }.take(5),
-            todayPages = todayPages,
-            todayDurationSeconds = todaySecs,
-            readingDays = readingDays
+    // 2) Combine the 6th (readingDays) on top of the typed core.
+    val uiState: StateFlow<StatsUiState> =
+        combine(coreStatsFlow, bookRepo.observeReadingDaysLastYear()) { core, readingDays ->
+            StatsUiState(
+                completedCount = core.stats.completedCount,
+                totalBookCount = core.stats.totalBookCount,
+                totalPagesInLibrary = core.stats.totalPagesInLibrary,
+                totalPagesRead = core.stats.totalPagesRead,
+                totalDurationSeconds = core.stats.totalDurationSeconds,
+                currentStreakDays = computeStreak(core.stats.distinctDays),
+                goals = core.goals,
+                recentBooks = core.allBooks.sortedByDescending { it.updatedAt }.take(5),
+                todayPages = core.todayPages,
+                todayDurationSeconds = core.todaySecs,
+                readingDays = readingDays
+            )
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            StatsUiState()
         )
-    }.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        StatsUiState()
-    )
 
     fun saveGoals(yearly: Int, dailyPages: Int, dailyMinutes: Int) {
         viewModelScope.launch {
@@ -98,11 +105,8 @@ class StatsViewModel(
                         out.write(text.toByteArray(Charsets.UTF_8))
                     } ?: error("Could not open output stream")
                 }
-            }.onSuccess {
-                _message.value = "Backup saved"
-            }.onFailure {
-                _message.value = "Export failed: ${it.message}"
-            }
+            }.onSuccess { _message.value = "Backup saved" }
+                .onFailure { _message.value = "Export failed: ${it.message}" }
         }
     }
 
@@ -117,54 +121,37 @@ class StatsViewModel(
 
                 val books = payload.books.map { b ->
                     BookEntity(
-                        id = b.id,
-                        title = b.title,
-                        author = b.author,
-                        totalPages = b.totalPages,
-                        currentPage = b.currentPage,
-                        genre = b.genre,
-                        coverColor = b.coverColor,
-                        coverImageUri = b.coverImageUri,
-                        rating = b.rating,
+                        id = b.id, title = b.title, author = b.author,
+                        totalPages = b.totalPages, currentPage = b.currentPage,
+                        genre = b.genre, coverColor = b.coverColor,
+                        coverImageUri = b.coverImageUri, rating = b.rating,
                         status = runCatching { ReadingStatus.valueOf(b.status) }
                             .getOrDefault(ReadingStatus.WANT_TO_READ),
                         startDate = b.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
                         finishDate = b.finishDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() },
-                        createdAt = b.createdAt,
-                        updatedAt = b.updatedAt
+                        createdAt = b.createdAt, updatedAt = b.updatedAt
                     )
                 }
                 val sessions = payload.sessions.map { s ->
                     ReadingSessionEntity(
-                        id = s.id,
-                        bookId = s.bookId,
-                        startedAt = s.startedAt,
-                        endedAt = s.endedAt,
+                        id = s.id, bookId = s.bookId,
+                        startedAt = s.startedAt, endedAt = s.endedAt,
                         durationSeconds = s.durationSeconds,
-                        startPage = s.startPage,
-                        endPage = s.endPage,
-                        pagesRead = s.pagesRead
+                        startPage = s.startPage, endPage = s.endPage, pagesRead = s.pagesRead
                     )
                 }
                 val notes = payload.notes.map { n ->
                     BookNoteEntity(
-                        id = n.id,
-                        bookId = n.bookId,
+                        id = n.id, bookId = n.bookId,
                         type = runCatching { NoteType.valueOf(n.type) }
                             .getOrDefault(NoteType.NOTE),
-                        content = n.content,
-                        pageNumber = n.pageNumber,
-                        tags = n.tags,
-                        createdAt = n.createdAt,
-                        updatedAt = n.updatedAt
+                        content = n.content, pageNumber = n.pageNumber,
+                        tags = n.tags, createdAt = n.createdAt, updatedAt = n.updatedAt
                     )
                 }
                 bookRepo.replaceAll(books, sessions, notes)
-            }.onSuccess {
-                _message.value = "Restore complete"
-            }.onFailure {
-                _message.value = "Import failed: ${it.message}"
-            }
+            }.onSuccess { _message.value = "Restore complete" }
+                .onFailure { _message.value = "Import failed: ${it.message}" }
         }
     }
 
@@ -175,20 +162,16 @@ class StatsViewModel(
         val parsed = days.mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
             .sortedDescending()
         if (parsed.isEmpty()) return 0
-
         val today = LocalDate.now()
         var cursor = today
         if (parsed.first() == today.minusDays(1)) cursor = today.minusDays(1)
         else if (parsed.first() != today) return 0
-
         var streak = 0
         for (d in parsed) {
             if (d == cursor) {
                 streak++
                 cursor = cursor.minusDays(1)
-            } else if (d < cursor) {
-                break
-            }
+            } else if (d < cursor) break
         }
         return streak
     }
