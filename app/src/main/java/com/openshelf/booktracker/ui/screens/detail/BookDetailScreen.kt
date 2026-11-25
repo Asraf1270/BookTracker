@@ -66,6 +66,7 @@ import com.openshelf.booktracker.data.local.entity.ReadingStatus
 import com.openshelf.booktracker.ui.components.BookCover
 import com.openshelf.booktracker.ui.components.EmptyStateView
 import com.openshelf.booktracker.ui.components.ProgressRing
+import com.openshelf.booktracker.ui.screens.library.AddEditBookSheet
 import com.openshelf.booktracker.util.ViewModelFactory
 import com.openshelf.booktracker.ui.components.RatingStars
 
@@ -337,6 +338,17 @@ fun BookDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDeleteBook = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (showEditSheet && current != null) {
+        AddEditBookSheet(
+            existingBook = current,
+            onDismiss = { showEditSheet = false },
+            onSave = {
+                vm.updateBook(it)
+                showEditSheet = false
             }
         )
     }
