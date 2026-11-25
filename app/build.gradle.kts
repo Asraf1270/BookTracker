@@ -15,7 +15,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -111,4 +111,10 @@ dependencies {
 
     // Serialization (JSON backup)
     implementation(libs.kotlinx.serialization.json)
+
+        // Image loading for book covers
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Full icon set (R8 strips unused in release)
+    implementation("androidx.compose.material:material-icons-extended")
 }
