@@ -24,8 +24,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -68,7 +66,9 @@ import com.openshelf.booktracker.data.local.entity.ReadingStatus
 import com.openshelf.booktracker.ui.components.BookCover
 import com.openshelf.booktracker.ui.components.EmptyStateView
 import com.openshelf.booktracker.ui.components.ProgressRing
+import com.openshelf.booktracker.ui.screens.library.AddEditBookSheet
 import com.openshelf.booktracker.util.ViewModelFactory
+import com.openshelf.booktracker.ui.components.RatingStars
 
 private enum class NotesFilter { ALL, NOTES, QUOTES }
 
@@ -95,7 +95,7 @@ fun BookDetailScreen(
     var pendingDeleteNote by remember { mutableStateOf<BookNoteEntity?>(null) }
     var pendingDeleteBook by remember { mutableStateOf(false) }
     var notesFilter by remember { mutableStateOf(NotesFilter.ALL) }
-
+    var showEditSheet by remember { mutableStateOf(false) }
     val current = book
 
     Scaffold(
@@ -109,6 +109,9 @@ fun BookDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showEditSheet = true }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "Edit book")
+                    }
                     IconButton(onClick = { pendingDeleteBook = true }) {
                         Icon(Icons.Filled.Delete, contentDescription = "Delete book")
                     }
@@ -174,6 +177,21 @@ fun BookDetailScreen(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(8.dp))
+                            Divider(color = MaterialTheme.colorScheme.outlineVariant)
+                            Spacer(Modifier.height(4.dp))
+                            // Latest 5 sessions inline
+                            sessions.take(5).forEach { s ->
+                                SessionRow(session = s)
+                            }
+                            if (sessions.size > 5) {
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    "+ ${sessions.size - 5} more",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 }
@@ -323,6 +341,17 @@ fun BookDetailScreen(
             }
         )
     }
+
+    if (showEditSheet && current != null) {
+        AddEditBookSheet(
+            existingBook = current,
+            onDismiss = { showEditSheet = false },
+            onSave = {
+                vm.updateBook(it)
+                showEditSheet = false
+            }
+        )
+    }
 }
 
 // ---------------- Sub-composables ----------------
@@ -390,15 +419,10 @@ private fun HeaderCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable { onEditRating() }
                 ) {
-                    for (i in 1..5) {
-                        Icon(
-                            imageVector = if (book.rating >= i) Icons.Filled.Star
-                                          else Icons.Filled.StarBorder,
-                            contentDescription = "Rate",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.tertiary
-                        )
-                    }
+                    RatingStars(
+                        rating = book.rating,
+                        starSize = 20.dp
+                    )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         if (book.rating <= 0f) "Tap to rate"
@@ -673,6 +697,49 @@ private fun NoteEditorDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
+}
+
+@Composable
+private fun SessionRow(session: com.openshelf.booktracker.data.local.entity.ReadingSessionEntity) {
+    val date = java.time.Instant.ofEpochMilli(session.startedAt)
+        .atZone(java.time.ZoneId.systemDefault())
+        .toLocalDate()
+    val minutes = session.durationSeconds / 60
+    val label = when {
+        minutes >= 60 -> "${minutes / 60}h ${minutes % 60}m"
+        minutes > 0 -> "${minutes}m"
+        else -> "${session.durationSeconds}s"
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                date.format(java.time.format.DateTimeFormatter.ofPattern("MMM d")),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "pp. ${session.startPage} → ${session.endPage} (+${session.pagesRead})",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun Divider(color: androidx.compose.ui.graphics.Color) {
+    androidx.compose.material3.HorizontalDivider(color = color)
 }
 
 private fun ReadingStatus.pretty(): String = when (this) {

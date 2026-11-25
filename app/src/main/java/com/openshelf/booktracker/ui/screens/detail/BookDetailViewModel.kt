@@ -53,6 +53,10 @@ class BookDetailViewModel(
         viewModelScope.launch { repo.updateProgress(bookId, newPage) }
     }
 
+    fun updateBook(updated: BookEntity) {
+        viewModelScope.launch { repo.updateBook(updated) }
+    }
+
     // -------- Sessions --------
     fun logSession(
         startedAt: Long,

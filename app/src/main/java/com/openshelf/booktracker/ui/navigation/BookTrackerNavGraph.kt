@@ -23,8 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.NavType
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
+import com.openshelf.booktracker.ui.screens.stats.StatsScreen
 
 @Composable
 fun BookTrackerNavGraph(
@@ -88,8 +87,7 @@ fun BookTrackerNavGraph(
             }
 
             composable(Screen.Stats.route) {
-                // Phase 6 will replace with StatsScreen(...)
-                PlaceholderScreen("Stats")
+                StatsScreen()
             }
 
             composable(
@@ -118,17 +116,4 @@ private fun Screen.icon(): ImageVector = when (this) {
     Screen.Library -> Icons.AutoMirrored.Filled.MenuBook
     Screen.Stats -> Icons.Filled.BarChart
     else -> Icons.Filled.BarChart
-}
-
-@Composable
-private fun PlaceholderScreen(title: String) {
-    androidx.compose.foundation.layout.Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = androidx.compose.ui.Alignment.Center
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.headlineMedium
-        )
-    }
 }

@@ -68,6 +68,32 @@ class BookRepository(
         }
     }
 
+    /** Explicitly set status — used by long-press "Mark as Completed" menu. */
+    suspend fun updateStatus(bookId: Long, status: ReadingStatus) {
+        val book = bookDao.getById(bookId) ?: return
+        val now = System.currentTimeMillis()
+        val updated = when (status) {
+            ReadingStatus.COMPLETED -> book.copy(
+                status = status,
+                currentPage = book.totalPages,
+                finishDate = book.finishDate ?: LocalDate.now(),
+                updatedAt = now
+            )
+            ReadingStatus.CURRENTLY_READING -> book.copy(
+                status = status,
+                finishDate = null,
+                startDate = book.startDate ?: LocalDate.now(),
+                updatedAt = now
+            )
+            ReadingStatus.WANT_TO_READ -> book.copy(
+                status = status,
+                finishDate = null,
+                updatedAt = now
+            )
+        }
+        bookDao.update(updated)
+    }
+
     // ---- Sessions ----
     fun observeSessionsForBook(bookId: Long): Flow<List<ReadingSessionEntity>> =
         sessionDao.observeForBook(bookId)
@@ -77,9 +103,23 @@ class BookRepository(
     fun observeTotalPagesRead(): Flow<Int> = sessionDao.observeTotalPagesRead()
     fun observeDistinctReadingDays(): Flow<List<String>> = sessionDao.observeDistinctReadingDays()
 
+    /** Epoch millis of today's local midnight (00:00). */
+    fun todayStartMillis(): Long =
+        LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+
+    fun observeTodayPagesRead(): Flow<Int> =
+        sessionDao.observePagesReadSince(todayStartMillis())
+
+    fun observeTodayDurationSeconds(): Flow<Long> =
+        sessionDao.observeDurationSecondsSince(todayStartMillis())
+        
     suspend fun logSession(session: ReadingSessionEntity): Long =
         sessionDao.insert(session)
 
+    fun observeReadingDaysLastYear(): Flow<List<SessionDao.DayAggregate>> =
+        sessionDao.observePerDayAggregate(
+            System.currentTimeMillis() - 365L * 24 * 60 * 60 * 1000
+        )
     // ---- Notes ----
     fun observeNotesForBook(bookId: Long): Flow<List<BookNoteEntity>> =
         noteDao.observeForBook(bookId)
