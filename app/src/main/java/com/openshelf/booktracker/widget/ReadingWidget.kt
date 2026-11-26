@@ -26,6 +26,11 @@ import androidx.glance.unit.ColorProvider
 import com.openshelf.booktracker.data.local.dao.SessionDao
 import com.openshelf.booktracker.data.repository.PreferencesRepository
 import kotlinx.coroutines.flow.firstOrNull
+import androidx.glance.action.clickable
+import androidx.glance.appwidget.action.actionStartActivity
+import android.content.Intent
+import com.openshelf.booktracker.MainActivity
+import androidx.glance.LocalContext
 
 class ReadingWidget : GlanceAppWidget() {
 
@@ -74,11 +79,20 @@ class ReadingWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(streak: Int, todayPages: Int) {
+        val launchIntent = Intent(
+            LocalContext.current,
+            MainActivity::class.java
+        ).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_OPEN_STATS, true)
+        }
+
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.surface)
-                .padding(12.dp),
+                .padding(12.dp)
+                .clickable(actionStartActivity(launchIntent)),       // ← added
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

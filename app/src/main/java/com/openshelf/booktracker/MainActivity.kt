@@ -12,22 +12,28 @@ import com.openshelf.booktracker.ui.theme.BookTrackerTheme
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        const val EXTRA_OPEN_STATS = "open_stats"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Android 13+ runtime permission for notifications.
-        // If denied, the app still works — only the daily reminder won't fire.
+        // Android 13+ runtime notification permission
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val launcher = registerForActivityResult(
                 ActivityResultContracts.RequestPermission()
-            ) { /* granted or denied — both acceptable */ }
+            ) { /* granted or denied — either way, continue */ }
             launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        // Widget tap → open Stats tab directly
+        val openStats = intent?.getBooleanExtra(EXTRA_OPEN_STATS, false) == true
+
         setContent {
             BookTrackerTheme {
-                BookTrackerNavGraph()
+                BookTrackerNavGraph(startOnStats = openStats)
             }
         }
     }

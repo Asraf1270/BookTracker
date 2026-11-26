@@ -1,32 +1,38 @@
 package com.openshelf.booktracker.ui.navigation
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.navigation.NavType
+import com.openshelf.booktracker.ui.screens.detail.BookDetailScreen
+import com.openshelf.booktracker.ui.screens.library.LibraryScreen
 import com.openshelf.booktracker.ui.screens.stats.StatsScreen
 
 @Composable
 fun BookTrackerNavGraph(
+    startOnStats: Boolean = false,
     navController: NavHostController = rememberNavController()
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -75,11 +81,11 @@ fun BookTrackerNavGraph(
     ) { innerPadding ->
         NavHost(
             navController = navController,
-            startDestination = Screen.Library.route,
+            startDestination = if (startOnStats) Screen.Stats.route else Screen.Library.route,
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(Screen.Library.route) {
-                com.openshelf.booktracker.ui.screens.library.LibraryScreen(
+                LibraryScreen(
                     onBookClick = { bookId ->
                         navController.navigate(Screen.BookDetail.createRoute(bookId))
                     }
@@ -96,8 +102,9 @@ fun BookTrackerNavGraph(
                     navArgument(Screen.BookDetail.ARG_BOOK_ID) { type = NavType.LongType }
                 )
             ) { backStackEntry ->
-                val bookId = backStackEntry.arguments?.getLong(Screen.BookDetail.ARG_BOOK_ID) ?: -1L
-                com.openshelf.booktracker.ui.screens.detail.BookDetailScreen(
+                val bookId = backStackEntry.arguments
+                    ?.getLong(Screen.BookDetail.ARG_BOOK_ID) ?: -1L
+                BookDetailScreen(
                     bookId = bookId,
                     onBack = { navController.popBackStack() }
                 )
@@ -116,4 +123,18 @@ private fun Screen.icon(): ImageVector = when (this) {
     Screen.Library -> Icons.AutoMirrored.Filled.MenuBook
     Screen.Stats -> Icons.Filled.BarChart
     else -> Icons.Filled.BarChart
+}
+
+// Unused but kept for reference if you ever need an inline placeholder
+@Composable
+private fun PlaceholderScreen(title: String) {
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineMedium
+        )
+    }
 }
