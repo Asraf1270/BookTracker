@@ -13,10 +13,24 @@ interface SessionDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(session: ReadingSessionEntity): Long
 
-    @Query("SELECT * FROM reading_sessions WHERE bookId = :bookId ORDER BY startedAt DESC")
+    /** Session history visible in UI — excludes zero-duration page-delta rows. */
+    @Query(
+        """
+        SELECT * FROM reading_sessions
+        WHERE bookId = :bookId AND durationSeconds > 0
+        ORDER BY startedAt DESC
+        """
+    )
     fun observeForBook(bookId: Long): Flow<List<ReadingSessionEntity>>
 
-    @Query("SELECT * FROM reading_sessions ORDER BY startedAt DESC LIMIT :limit")
+    /** Recent real sessions (for stats "recent activity"). */
+    @Query(
+        """
+        SELECT * FROM reading_sessions
+        WHERE durationSeconds > 0
+        ORDER BY startedAt DESC LIMIT :limit
+        """
+    )
     fun observeRecent(limit: Int = 20): Flow<List<ReadingSessionEntity>>
 
     @Query("SELECT COALESCE(SUM(durationSeconds), 0) FROM reading_sessions")
@@ -25,7 +39,6 @@ interface SessionDao {
     @Query("SELECT COALESCE(SUM(pagesRead), 0) FROM reading_sessions")
     fun observeTotalPagesRead(): Flow<Int>
 
-    // Distinct epoch-day strings ("2024-11-23") for streak computation
     @Query(
         """
         SELECT DISTINCT strftime('%Y-%m-%d', startedAt / 1000, 'unixepoch', 'localtime')
@@ -35,15 +48,7 @@ interface SessionDao {
     )
     fun observeDistinctReadingDays(): Flow<List<String>>
 
-    @Query("SELECT * FROM reading_sessions")
-    suspend fun getAllOnce(): List<ReadingSessionEntity>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAll(sessions: List<ReadingSessionEntity>)
-
-    @Query("DELETE FROM reading_sessions")
-    suspend fun clearAll()
-
+    // --- Today's activity ---
     @Query(
         """
         SELECT COALESCE(SUM(pagesRead), 0) FROM reading_sessions
@@ -60,7 +65,8 @@ interface SessionDao {
     )
     fun observeDurationSecondsSince(dayStartMillis: Long): Flow<Long>
 
-        data class DayAggregate(
+    // --- Per-day aggregate for heatmap ---
+    data class DayAggregate(
         val day: String,
         val pages: Int,
         val minutes: Int
@@ -78,4 +84,13 @@ interface SessionDao {
         """
     )
     fun observePerDayAggregate(sinceMillis: Long): Flow<List<DayAggregate>>
+
+    @Query("SELECT * FROM reading_sessions")
+    suspend fun getAllOnce(): List<ReadingSessionEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(sessions: List<ReadingSessionEntity>)
+
+    @Query("DELETE FROM reading_sessions")
+    suspend fun clearAll()
 }

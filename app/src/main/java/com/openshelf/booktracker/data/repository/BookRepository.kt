@@ -39,9 +39,28 @@ class BookRepository(
     suspend fun updateProgress(bookId: Long, newPage: Int) {
         val book = bookDao.getById(bookId) ?: return
         val clamped = newPage.coerceIn(0, book.totalPages)
+        if (clamped == book.currentPage) return     // no change → no session, no book update
+
         val now = System.currentTimeMillis()
+        val delta = clamped - book.currentPage      // may be negative (backward correction)
 
         bookDao.updateProgress(bookId, clamped, now)
+
+        // Log a zero-duration session ONLY for forward progress.
+        // Backward corrections are not counted as "read" pages.
+        if (delta > 0) {
+            sessionDao.insert(
+                ReadingSessionEntity(
+                    bookId = bookId,
+                    startedAt = now,
+                    endedAt = now,
+                    durationSeconds = 0L,
+                    startPage = book.currentPage,
+                    endPage = clamped,
+                    pagesRead = delta
+                )
+            )
+        }
 
         val reachedEnd = clamped >= book.totalPages && book.totalPages > 0
         when {

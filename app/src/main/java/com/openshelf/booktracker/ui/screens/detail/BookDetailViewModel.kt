@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import com.openshelf.booktracker.data.local.entity.ReadingStatus
+import java.time.LocalDate
 
 data class NotesUiState(
     val notes: List<BookNoteEntity> = emptyList(),
@@ -67,6 +69,8 @@ class BookDetailViewModel(
         viewModelScope.launch {
             val duration = (endedAt - startedAt).coerceAtLeast(0L) / 1000L
             val pages = (endPage - startPage).coerceAtLeast(0)
+
+            // Insert the session first
             repo.logSession(
                 ReadingSessionEntity(
                     bookId = bookId,
@@ -78,8 +82,22 @@ class BookDetailViewModel(
                     pagesRead = pages
                 )
             )
-            if (endPage > startPage) {
-                repo.updateProgress(bookId, endPage)
+
+            // Advance the book WITHOUT creating another session.
+            // Use a raw book update, not updateProgress(...).
+            val current = book.value ?: return@launch
+            if (endPage > current.currentPage) {
+                val clamped = endPage.coerceIn(0, current.totalPages)
+                repo.updateBook(
+                    current.copy(
+                        currentPage = clamped,
+                        status = if (clamped >= current.totalPages)
+                            ReadingStatus.COMPLETED else current.status,
+                        finishDate = if (clamped >= current.totalPages)
+                            LocalDate.now() else current.finishDate,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
             }
         }
     }
