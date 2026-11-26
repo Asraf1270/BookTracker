@@ -52,6 +52,9 @@ import com.openshelf.booktracker.BookTrackerApp
 import com.openshelf.booktracker.util.ViewModelFactory
 import androidx.compose.ui.draw.clip
 import com.openshelf.booktracker.ui.components.StreakHeatmap
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Switch
+import com.openshelf.booktracker.data.repository.ReminderSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +66,7 @@ fun StatsScreen(modifier: Modifier = Modifier) {
 
     val uiState by vm.uiState.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val reminderState by vm.reminderSettings.collectAsStateWithLifecycle()
 
     var selectedTab by remember { mutableIntStateOf(0) }
 
@@ -128,7 +132,12 @@ fun StatsScreen(modifier: Modifier = Modifier) {
 
             when (selectedTab) {
                 0 -> OverviewTab(uiState)
-                1 -> GoalsTab(uiState, onSave = vm::saveGoals)
+                1 -> GoalsTab(
+                    uiState = uiState,
+                    onSave = vm::saveGoals,
+                    reminder = reminderState,
+                    onSaveReminder = { enabled, h, m -> vm.setReminder(enabled, h, m) }
+                )
             }
         }
     }
@@ -295,7 +304,12 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun GoalsTab(uiState: StatsUiState, onSave: (Int, Int, Int) -> Unit) {
+private fun GoalsTab(
+    uiState: StatsUiState,
+    onSave: (Int, Int, Int) -> Unit,
+    reminder: ReminderSettings,
+    onSaveReminder: (Boolean, Int, Int) -> Unit
+) {
     var yearly by remember(uiState.goals.yearlyBookGoal) {
         mutableStateOf(uiState.goals.yearlyBookGoal.toString())
     }
@@ -306,11 +320,17 @@ private fun GoalsTab(uiState: StatsUiState, onSave: (Int, Int, Int) -> Unit) {
         mutableStateOf(uiState.goals.dailyMinuteGoal.toString())
     }
 
+    // Reminder state
+    var reminderEnabled by remember(reminder.enabled) { mutableStateOf(reminder.enabled) }
+    var reminderHour by remember(reminder.hour) { mutableStateOf(reminder.hour) }
+    var reminderMinute by remember(reminder.minute) { mutableStateOf(reminder.minute) }
+
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Reading goals", style = MaterialTheme.typography.titleLarge)
+
         OutlinedTextField(
             value = yearly,
             onValueChange = { yearly = it.filter(Char::isDigit) },
@@ -335,6 +355,7 @@ private fun GoalsTab(uiState: StatsUiState, onSave: (Int, Int, Int) -> Unit) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+
         Button(
             onClick = {
                 onSave(
@@ -345,6 +366,73 @@ private fun GoalsTab(uiState: StatsUiState, onSave: (Int, Int, Int) -> Unit) {
             },
             modifier = Modifier.fillMaxWidth()
         ) { Text("Save goals") }
+
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+        // ---- Daily reminder ----
+        Text("Daily reminder", style = MaterialTheme.typography.titleMedium)
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Remind me daily", style = MaterialTheme.typography.labelLarge)
+                Text(
+                    "Only if you haven't read yet",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = reminderEnabled,
+                onCheckedChange = { checked ->
+                    reminderEnabled = checked
+                    onSaveReminder(checked, reminderHour, reminderMinute)
+                }
+            )
+        }
+
+        if (reminderEnabled) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = reminderHour.toString().padStart(2, '0'),
+                    onValueChange = {
+                        it.filter(Char::isDigit).toIntOrNull()?.let { v ->
+                            reminderHour = v.coerceIn(0, 23)
+                        }
+                    },
+                    label = { Text("Hour") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                OutlinedTextField(
+                    value = reminderMinute.toString().padStart(2, '0'),
+                    onValueChange = {
+                        it.filter(Char::isDigit).toIntOrNull()?.let { v ->
+                            reminderMinute = v.coerceIn(0, 59)
+                        }
+                    },
+                    label = { Text("Minute") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                Button(onClick = {
+                    onSaveReminder(true, reminderHour, reminderMinute)
+                }) { Text("Set") }
+            }
+            Text(
+                "Reminder will fire at %02d:%02d".format(reminderHour, reminderMinute),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

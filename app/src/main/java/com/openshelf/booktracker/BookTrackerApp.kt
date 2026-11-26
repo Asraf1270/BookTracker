@@ -7,6 +7,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.openshelf.booktracker.notifications.NotificationHelper
+import com.openshelf.booktracker.notifications.ReminderWorker
+import kotlinx.coroutines.flow.first
+import java.util.Calendar
+import java.util.concurrent.TimeUnit
 
 class BookTrackerApp : Application() {
 
@@ -18,6 +26,9 @@ class BookTrackerApp : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+
+        NotificationHelper.ensureChannel(this)
+        scheduleReminderIfEnabled()
 
         // ---- SEED (disable in production or gate behind a flag) ----
         appScope.launch {
@@ -65,4 +76,47 @@ class BookTrackerApp : Application() {
             )
         )
     }
+
+        private fun scheduleReminderIfEnabled() {
+        appScope.launch {
+            val settings = container.preferencesRepository.reminderSettings.first()
+            if (settings.enabled) {
+                scheduleReminder(settings.hour, settings.minute)
+            }
+        }
+    }
+
+    /**
+     * Enqueues a one-time work item that fires at the next occurrence of
+     * [hour]:[minute] local time. The worker re-schedules itself after running.
+     * Using `REPLACE` policy means calling this again just updates the time.
+     */
+    fun scheduleReminder(hour: Int, minute: Int) {
+        val calendar = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        if (calendar.timeInMillis <= System.currentTimeMillis()) {
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        val delayMs = calendar.timeInMillis - System.currentTimeMillis()
+
+        val request = OneTimeWorkRequestBuilder<ReminderWorker>()
+            .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
+            .addTag(ReminderWorker.WORK_NAME)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            ReminderWorker.WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    fun cancelReminder() {
+        WorkManager.getInstance(this).cancelUniqueWork(ReminderWorker.WORK_NAME)
+    }
+    
 }

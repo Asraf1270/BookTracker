@@ -29,7 +29,7 @@ class ViewModelFactory(
                 BookDetailViewModel(bookRepo, extras.createSavedStateHandle()) as T
 
             modelClass.isAssignableFrom(StatsViewModel::class.java) ->
-                StatsViewModel(bookRepo, prefsRepo) as T
+                StatsViewModel(bookRepo, prefsRepo, app) as T
 
             else -> throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
         }

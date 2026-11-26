@@ -14,8 +14,8 @@ android {
         applicationId = "com.openshelf.booktracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.3.1"
+        versionCode = 2
+        versionName = "1.4.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
@@ -117,4 +117,7 @@ dependencies {
 
     // Full icon set (R8 strips unused in release)
     implementation("androidx.compose.material:material-icons-extended")
+
+    // Daily reading reminder
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

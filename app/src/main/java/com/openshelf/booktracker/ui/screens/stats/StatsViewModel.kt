@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
+import com.openshelf.booktracker.BookTrackerApp
+import com.openshelf.booktracker.data.repository.ReminderSettings
 
 data class StatsUiState(
     val completedCount: Int = 0,
@@ -40,12 +42,31 @@ data class StatsUiState(
 
 class StatsViewModel(
     private val bookRepo: BookRepository,
-    private val prefsRepo: PreferencesRepository
+    private val prefsRepo: PreferencesRepository,
+    private val appRef: BookTrackerApp? = null
 ) : ViewModel() {
 
     private val _message = MutableStateFlow<String?>(null)
     val message: StateFlow<String?> = _message.asStateFlow()
 
+    val reminderSettings: StateFlow<ReminderSettings> =
+        prefsRepo.reminderSettings.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            ReminderSettings()
+        )
+
+    fun setReminder(enabled: Boolean, hour: Int, minute: Int) {
+        viewModelScope.launch {
+            prefsRepo.setReminder(enabled, hour, minute)
+            if (enabled) appRef?.scheduleReminder(hour, minute)
+            else appRef?.cancelReminder()
+            _message.value = if (enabled) "Reminder set for %02d:%02d".format(hour, minute)
+                             else "Reminder disabled"
+        }
+    }
+
+    
     // 1) Combine the 5 flows that existed before the heatmap was added.
     //    All 5 have strongly typed overloads, so no casting is needed.
     private data class CoreStats(

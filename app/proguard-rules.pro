@@ -14,3 +14,11 @@
 -keepclasseswithmembers class com.openshelf.booktracker.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
+
+# WorkManager
+-keep class androidx.work.** { *; }
+-keep class * extends androidx.work.Worker
+-keep class * extends androidx.work.CoroutineWorker
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
