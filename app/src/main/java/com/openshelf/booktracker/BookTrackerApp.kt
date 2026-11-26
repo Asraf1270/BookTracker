@@ -1,18 +1,20 @@
 package com.openshelf.booktracker
 
 import android.app.Application
-import com.openshelf.booktracker.di.AppContainer
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import com.openshelf.booktracker.data.local.entity.BookEntity
+import com.openshelf.booktracker.data.local.entity.ReadingStatus
+import com.openshelf.booktracker.di.AppContainer
 import com.openshelf.booktracker.notifications.NotificationHelper
 import com.openshelf.booktracker.notifications.ReminderWorker
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -27,59 +29,27 @@ class BookTrackerApp : Application() {
         super.onCreate()
         container = AppContainer(this)
 
+        // Create the notification channel up front so it exists before WorkManager fires
         NotificationHelper.ensureChannel(this)
-        scheduleReminderIfEnabled()
 
-        // ---- SEED (disable in production or gate behind a flag) ----
-        appScope.launch {
-            if (container.bookRepository.observeAllBooks().first().isEmpty()) {
-                seedIfEmpty()
+        // Seed sample data — DEBUG builds only
+        if (BuildConfig.DEBUG) {
+            appScope.launch {
+                val existing = container.bookRepository.observeAllBooks().firstOrNull()
+                if (existing.isNullOrEmpty()) {
+                    seedIfEmpty()
+                }
             }
         }
+
+        // Re-arm the reminder if the user had it enabled
+        scheduleReminderIfEnabled()
     }
 
-    private suspend fun seedIfEmpty() {
-        val repo = container.bookRepository
-        repo.addBook(
-            com.openshelf.booktracker.data.local.entity.BookEntity(
-                title = "The Pragmatic Programmer",
-                author = "Hunt & Thomas",
-                totalPages = 352,
-                currentPage = 120,
-                genre = "Software",
-                coverColor = 0xFF6750A4,
-                status = com.openshelf.booktracker.data.local.entity.ReadingStatus.CURRENTLY_READING
-            )
-        )
-        repo.addBook(
-            com.openshelf.booktracker.data.local.entity.BookEntity(
-                title = "Atomic Habits",
-                author = "James Clear",
-                totalPages = 320,
-                currentPage = 320,
-                genre = "Self-help",
-                coverColor = 0xFF00897B,
-                status = com.openshelf.booktracker.data.local.entity.ReadingStatus.COMPLETED,
-                rating = 4.5f,
-                finishDate = java.time.LocalDate.now().minusDays(3)
-            )
-        )
-        repo.addBook(
-            com.openshelf.booktracker.data.local.entity.BookEntity(
-                title = "Deep Work",
-                author = "Cal Newport",
-                totalPages = 296,
-                currentPage = 0,
-                genre = "Productivity",
-                coverColor = 0xFFD81B60,
-                status = com.openshelf.booktracker.data.local.entity.ReadingStatus.WANT_TO_READ
-            )
-        )
-    }
-
-        private fun scheduleReminderIfEnabled() {
+    private fun scheduleReminderIfEnabled() {
         appScope.launch {
-            val settings = container.preferencesRepository.reminderSettings.first()
+            val settings = container.preferencesRepository.reminderSettings.firstOrNull()
+                ?: return@launch
             if (settings.enabled) {
                 scheduleReminder(settings.hour, settings.minute)
             }
@@ -89,7 +59,6 @@ class BookTrackerApp : Application() {
     /**
      * Enqueues a one-time work item that fires at the next occurrence of
      * [hour]:[minute] local time. The worker re-schedules itself after running.
-     * Using `REPLACE` policy means calling this again just updates the time.
      */
     fun scheduleReminder(hour: Int, minute: Int) {
         val calendar = Calendar.getInstance().apply {
@@ -118,5 +87,43 @@ class BookTrackerApp : Application() {
     fun cancelReminder() {
         WorkManager.getInstance(this).cancelUniqueWork(ReminderWorker.WORK_NAME)
     }
-    
+
+    private suspend fun seedIfEmpty() {
+        val repo = container.bookRepository
+        repo.addBook(
+            BookEntity(
+                title = "The Pragmatic Programmer",
+                author = "Hunt & Thomas",
+                totalPages = 352,
+                currentPage = 120,
+                genre = "Software",
+                coverColor = 0xFF6750A4,
+                status = ReadingStatus.CURRENTLY_READING
+            )
+        )
+        repo.addBook(
+            BookEntity(
+                title = "Atomic Habits",
+                author = "James Clear",
+                totalPages = 320,
+                currentPage = 320,
+                genre = "Self-help",
+                coverColor = 0xFF00897B,
+                status = ReadingStatus.COMPLETED,
+                rating = 4.5f,
+                finishDate = LocalDate.now().minusDays(3)
+            )
+        )
+        repo.addBook(
+            BookEntity(
+                title = "Deep Work",
+                author = "Cal Newport",
+                totalPages = 296,
+                currentPage = 0,
+                genre = "Productivity",
+                coverColor = 0xFFD81B60,
+                status = ReadingStatus.WANT_TO_READ
+            )
+        )
+    }
 }
