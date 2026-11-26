@@ -22,3 +22,8 @@
 -keep class * extends androidx.work.ListenableWorker {
     public <init>(android.content.Context, androidx.work.WorkerParameters);
 }
+
+# Glance widget
+-keep class androidx.glance.** { *; }
+-keep class * extends androidx.glance.appwidget.GlanceAppWidgetReceiver
+-keep class * extends androidx.glance.appwidget.GlanceAppWidget

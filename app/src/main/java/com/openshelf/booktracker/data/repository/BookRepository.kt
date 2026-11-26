@@ -14,8 +14,11 @@ import java.time.LocalDate
 class BookRepository(
     private val bookDao: BookDao,
     private val sessionDao: SessionDao,
-    private val noteDao: NoteDao
+    private val noteDao: NoteDao,
+    private val onDataChanged: () -> Unit = {}
 ) {
+
+    private fun notifyChanged() = onDataChanged()
 
     // ---- Books ----
     fun observeAllBooks(): Flow<List<BookEntity>> = bookDao.observeAll()
@@ -24,30 +27,32 @@ class BookRepository(
     fun searchBooks(query: String): Flow<List<BookEntity>> = bookDao.search(query)
     fun observeBook(id: Long): Flow<BookEntity?> = bookDao.observeById(id)
 
-    suspend fun addBook(book: BookEntity): Long = bookDao.insert(book)
+    suspend fun addBook(book: BookEntity): Long {
+        val id = bookDao.insert(book)
+        notifyChanged()
+        return id
+    }
 
-    suspend fun updateBook(book: BookEntity) =
+    suspend fun updateBook(book: BookEntity) {
         bookDao.update(book.copy(updatedAt = System.currentTimeMillis()))
+        notifyChanged()
+    }
 
-    suspend fun deleteBook(book: BookEntity) = bookDao.delete(book)
+    suspend fun deleteBook(book: BookEntity) {
+        bookDao.delete(book)
+        notifyChanged()
+    }
 
-    /**
-     * Update current page and auto-adjust status:
-     *  - progress reaches totalPages → COMPLETED + set finishDate
-     *  - progress drops below totalPages while previously COMPLETED → CURRENTLY_READING + clear finishDate
-     */
     suspend fun updateProgress(bookId: Long, newPage: Int) {
         val book = bookDao.getById(bookId) ?: return
         val clamped = newPage.coerceIn(0, book.totalPages)
-        if (clamped == book.currentPage) return     // no change → no session, no book update
+        if (clamped == book.currentPage) return
 
         val now = System.currentTimeMillis()
-        val delta = clamped - book.currentPage      // may be negative (backward correction)
+        val delta = clamped - book.currentPage
 
         bookDao.updateProgress(bookId, clamped, now)
 
-        // Log a zero-duration session ONLY for forward progress.
-        // Backward corrections are not counted as "read" pages.
         if (delta > 0) {
             sessionDao.insert(
                 ReadingSessionEntity(
@@ -85,9 +90,9 @@ class BookRepository(
                 )
             }
         }
+        notifyChanged()
     }
 
-    /** Explicitly set status — used by long-press "Mark as Completed" menu. */
     suspend fun updateStatus(bookId: Long, status: ReadingStatus) {
         val book = bookDao.getById(bookId) ?: return
         val now = System.currentTimeMillis()
@@ -111,18 +116,20 @@ class BookRepository(
             )
         }
         bookDao.update(updated)
+        notifyChanged()
     }
 
     // ---- Sessions ----
     fun observeSessionsForBook(bookId: Long): Flow<List<ReadingSessionEntity>> =
         sessionDao.observeForBook(bookId)
+
     fun observeRecentSessions(limit: Int = 20): Flow<List<ReadingSessionEntity>> =
         sessionDao.observeRecent(limit)
+
     fun observeTotalDurationSeconds(): Flow<Long> = sessionDao.observeTotalDurationSeconds()
     fun observeTotalPagesRead(): Flow<Int> = sessionDao.observeTotalPagesRead()
     fun observeDistinctReadingDays(): Flow<List<String>> = sessionDao.observeDistinctReadingDays()
 
-    /** Epoch millis of today's local midnight (00:00). */
     fun todayStartMillis(): Long =
         LocalDate.now().atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 
@@ -131,23 +138,39 @@ class BookRepository(
 
     fun observeTodayDurationSeconds(): Flow<Long> =
         sessionDao.observeDurationSecondsSince(todayStartMillis())
-        
-    suspend fun logSession(session: ReadingSessionEntity): Long =
-        sessionDao.insert(session)
 
     fun observeReadingDaysLastYear(): Flow<List<SessionDao.DayAggregate>> =
         sessionDao.observePerDayAggregate(
             System.currentTimeMillis() - 365L * 24 * 60 * 60 * 1000
         )
+
+    suspend fun logSession(session: ReadingSessionEntity): Long {
+        val id = sessionDao.insert(session)
+        notifyChanged()
+        return id
+    }
+
     // ---- Notes ----
     fun observeNotesForBook(bookId: Long): Flow<List<BookNoteEntity>> =
         noteDao.observeForBook(bookId)
-    suspend fun addNote(note: BookNoteEntity): Long = noteDao.insert(note)
-    suspend fun updateNote(note: BookNoteEntity) =
-        noteDao.update(note.copy(updatedAt = System.currentTimeMillis()))
-    suspend fun deleteNote(note: BookNoteEntity) = noteDao.delete(note)
 
-    // ---- Stats rollup (combine multiple aggregate flows) ----
+    suspend fun addNote(note: BookNoteEntity): Long {
+        val id = noteDao.insert(note)
+        notifyChanged()
+        return id
+    }
+
+    suspend fun updateNote(note: BookNoteEntity) {
+        noteDao.update(note.copy(updatedAt = System.currentTimeMillis()))
+        notifyChanged()
+    }
+
+    suspend fun deleteNote(note: BookNoteEntity) {
+        noteDao.delete(note)
+        notifyChanged()
+    }
+
+    // ---- Stats rollup ----
     data class StatsSnapshot(
         val completedCount: Int,
         val totalPagesInLibrary: Int,
@@ -185,10 +208,10 @@ class BookRepository(
         sessions: List<ReadingSessionEntity>,
         notes: List<BookNoteEntity>
     ) {
-        // Wipe sessions/notes first (FK cascade would also handle it via book deletion)
         sessionDao.clearAll()
         bookDao.insertAll(books)
         sessionDao.insertAll(sessions)
         noteDao.insertAll(notes)
+        notifyChanged()
     }
 }

@@ -88,6 +88,14 @@ class BookTrackerApp : Application() {
         WorkManager.getInstance(this).cancelUniqueWork(ReminderWorker.WORK_NAME)
     }
 
+    fun refreshWidget() {
+        androidx.work.WorkManager.getInstance(this)
+            .enqueue(
+                androidx.work.OneTimeWorkRequestBuilder<com.openshelf.booktracker.widget.WidgetUpdateWorker>()
+                    .build()
+            )
+    }
+    
     private suspend fun seedIfEmpty() {
         val repo = container.bookRepository
         repo.addBook(

@@ -80,4 +80,8 @@ class LibraryViewModel(
     fun updateStatus(bookId: Long, status: ReadingStatus) {
         viewModelScope.launch { repo.updateStatus(bookId, status) }
     }
+    // In LibraryViewModel / BookDetailViewModel
+    private fun triggerWidgetRefresh() {
+        // We don't have Application here either...
+    }
 }
