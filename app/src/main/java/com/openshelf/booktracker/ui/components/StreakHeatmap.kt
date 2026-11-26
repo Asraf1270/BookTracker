@@ -1,15 +1,16 @@
 package com.openshelf.booktracker.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -40,39 +41,38 @@ fun StreakHeatmap(
     val totalDays = ChronoUnit.DAYS.between(startOfWindow, today).toInt() + 1
     val totalWeeks = (totalDays + 6) / 7
 
-    val maxPages = days.maxOfOrNull { it.pages }?.coerceAtLeast(1) ?: 1
-
-    // Read theme colors here — Canvas draw block is not @Composable
+    // Theme colors captured OUTSIDE Canvas blocks
     val emptyColor = MaterialTheme.colorScheme.surfaceVariant
-    val baseColor = MaterialTheme.colorScheme.primary
+    val baseColor  = MaterialTheme.colorScheme.primary
     val todayBorder = MaterialTheme.colorScheme.primary
     val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
 
-    Column(modifier = modifier) {
-        // Month labels row
-        Row(modifier = Modifier.padding(start = 24.dp, bottom = 4.dp)) {
-            var lastMonth = -1
-            for (w in 0 until totalWeeks) {
-                val weekStart = startOfWindow.plusDays((w * 7).toLong())
-                val month = weekStart.monthValue
-                if (month != lastMonth) {
-                    Text(
-                        text = weekStart.month.name.take(3),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = labelColor,
-                        modifier = Modifier.width(14.dp)
-                    )
-                    lastMonth = month
-                } else {
-                    Spacer(Modifier.width(14.dp))
-                }
-            }
-        }
+    // 5-step intensity buckets — matches GitHub model
+    val levelColors = listOf(
+        emptyColor,                                        // 0 pages
+        lerp(baseColor, emptyColor, 0.75f),                // 1–9
+        lerp(baseColor, emptyColor, 0.50f),                // 10–29
+        lerp(baseColor, emptyColor, 0.25f),                // 30–59
+        baseColor                                          // 60+
+    )
 
+    fun bucket(pages: Int): Int = when {
+        pages <= 0   -> 0
+        pages < 10   -> 1
+        pages < 30   -> 2
+        pages < 60   -> 3
+        else         -> 4
+    }
+
+    val scrollState = rememberScrollState()
+
+    Column(modifier = modifier) {
         Row {
-            // Day-of-week labels
+            // Sticky day-of-week labels on the left
             Column(
-                modifier = Modifier.width(24.dp),
+                modifier = Modifier
+                    .width(28.dp)
+                    .padding(top = 20.dp),      // align with first row of cells
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 val labels = listOf("Sun", "", "Tue", "", "Thu", "", "Sat")
@@ -86,42 +86,65 @@ fun StreakHeatmap(
                 }
             }
 
-            Canvas(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(84.dp)   // 7 rows × 12dp — fixed literal
-            ) {
-                val cell = 10.dp.toPx()
-                val gap = 2.dp.toPx()
+            // Scrollable grid
+            Column(modifier = Modifier.horizontalScroll(scrollState)) {
 
-                for (w in 0 until totalWeeks) {
-                    for (d in 0 until 7) {
-                        val index = w * 7 + d
-                        if (index >= totalDays) break
-                        val date = startOfWindow.plusDays(index.toLong())
-                        if (date.isAfter(today)) continue
+                // Month labels
+                Row(modifier = Modifier.padding(bottom = 4.dp)) {
+                    var lastMonth = -1
+                    for (w in 0 until totalWeeks) {
+                        val weekStart = startOfWindow.plusDays((w * 7).toLong())
+                        val month = weekStart.monthValue
+                        if (month != lastMonth) {
+                            Text(
+                                text = weekStart.month.name.take(3),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = labelColor,
+                                modifier = Modifier.width(14.dp)
+                            )
+                            lastMonth = month
+                        } else {
+                            Spacer(Modifier.width(14.dp))
+                        }
+                    }
+                }
 
-                        val key = date.toString()
-                        val pages = byDay[key]?.pages ?: 0
-                        val color = if (pages == 0) emptyColor
-                                    else lerp(baseColor, emptyColor, 1f - (pages.toFloat() / maxPages))
+                // Grid canvas — fixed pixel width = totalWeeks * (cell + gap)
+                Canvas(
+                    modifier = Modifier
+                        .width((totalWeeks * 12).dp)   // 12dp per cell column
+                        .height(84.dp)
+                ) {
+                    val cell = 10.dp.toPx()
+                    val gap  = 2.dp.toPx()
 
-                        val topLeft = Offset(w * (cell + gap), d * (cell + gap))
-                        drawRoundRect(
-                            color = color,
-                            topLeft = topLeft,
-                            size = Size(cell, cell),
-                            cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
-                        )
+                    for (w in 0 until totalWeeks) {
+                        for (d in 0 until 7) {
+                            val index = w * 7 + d
+                            if (index >= totalDays) continue
+                            val date = startOfWindow.plusDays(index.toLong())
+                            if (date.isAfter(today)) continue
 
-                        if (date == today) {
+                            val pages = byDay[date.toString()]?.pages ?: 0
+                            val color = levelColors[bucket(pages)]
+                            val topLeft = Offset(w * (cell + gap), d * (cell + gap))
+
                             drawRoundRect(
-                                color = todayBorder,
+                                color = color,
                                 topLeft = topLeft,
                                 size = Size(cell, cell),
-                                cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
-                                style = Stroke(width = 1.5.dp.toPx())
+                                cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx())
                             )
+
+                            if (date == today) {
+                                drawRoundRect(
+                                    color = todayBorder,
+                                    topLeft = topLeft,
+                                    size = Size(cell, cell),
+                                    cornerRadius = CornerRadius(2.dp.toPx(), 2.dp.toPx()),
+                                    style = Stroke(width = 1.5.dp.toPx())
+                                )
+                            }
                         }
                     }
                 }
@@ -130,16 +153,10 @@ fun StreakHeatmap(
 
         Spacer(Modifier.height(8.dp))
 
-        // Legend
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Less", style = MaterialTheme.typography.labelSmall, color = labelColor)
             Spacer(Modifier.width(4.dp))
-            listOf(
-                emptyColor,
-                lerp(baseColor, emptyColor, 0.66f),
-                lerp(baseColor, emptyColor, 0.33f),
-                baseColor
-            ).forEach { c ->
+            levelColors.forEach { c ->
                 Canvas(Modifier.size(10.dp)) {
                     drawRoundRect(
                         color = c,
@@ -157,9 +174,9 @@ fun StreakHeatmap(
 private fun lerp(from: Color, to: Color, fraction: Float): Color {
     val f = fraction.coerceIn(0f, 1f)
     return Color(
-        red = from.red + (to.red - from.red) * f,
+        red   = from.red   + (to.red   - from.red)   * f,
         green = from.green + (to.green - from.green) * f,
-        blue = from.blue + (to.blue - from.blue) * f,
+        blue  = from.blue  + (to.blue  - from.blue)  * f,
         alpha = from.alpha + (to.alpha - from.alpha) * f
     )
 }
